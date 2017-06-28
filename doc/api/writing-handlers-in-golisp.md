@@ -10,7 +10,18 @@ The rest of this document assumes familiarity Lisp in general, and with SteelSer
 
 ## Getting started ##
 
-To start using GoLisp to create handlers, you need to create a lisp file that SteelSeries Engine will load.  First, locate the directory that Engine loads custom lisp from.  This location depends on your OS:
+To start using GoLisp to create handlers, you have two choices. You can either use Steelseries Engine to register GoLisp handlers or use the haX0rBindings directory.
+
+For using Steelseries Engine to register the handlers, you first must be using Steelseries Engine 3.9.0 or higher. You then need to send a JSON payload with both the game you're registering them for and the GoLisp handlers themselves. To do this you discover the Steelseries Engine port (you can do this using the guide in the [sending game event][server discovery] document) and sending it on the `/load_golisp_handlers` endpoint in this format:
+
+```json
+{
+  "game": "<Game name>",
+  "golisp": "<GoLisp handler code>"
+}
+```
+
+For the haX0rBindings method need to create a lisp file that SteelSeries Engine will load.  First, locate the directory that Engine loads custom lisp from.  This location depends on your OS:
 
 | OS          | Path                                                              |
 |-------------|-------------------------------------------------------------------|
@@ -29,7 +40,7 @@ So if you are on Windows, and your game is sending an event with the following J
 
 then you would create the file `%PROGRAMDATA%/SteelSeries/SteelSeries Engine 3/haX0rBindings/my_game.lsp`.
 
-_Note:_ Any handlers created in this file will now override all other handler values for the game in question, including those configured through SteelSeries Engine 3.  Those events will also not appear in SteelSeries Engine as available for customization unless the file is removed.
+_Note:_ Any handlers created a haX0rBindings file will now override all other handler values for the game in question, including those configured through SteelSeries Engine 3.  Those events will also not appear in SteelSeries Engine as available for customization unless the file is removed.
 
 ## Basic example and breakdown ##
 
@@ -38,11 +49,11 @@ Below is a simple example of how to display calculated colors on multiple device
     (handler "HEALTH"
       (lambda (data)
         (let* ((v (value: data))
-               (c (color-between red-color green-color v))
+               (c (color-between red-color green-color v)))
           (on-device 'rgb-per-key-zones show-percent-on-zone: c v function-keys:)
           (on-device 'rgb-2-zone show-on-zone: c two:)
-          (on-device 'rgb-1-zone show-on-zone: c one:)))))
-
+          (on-device 'rgb-1-zone show-on-zone: c one:))))
+    
     (add-event-per-key-zone-use "HEALTH" "function-keys")
 
 Line-by-line breakdown:
@@ -55,7 +66,7 @@ Line-by-line breakdown:
 
 4.The following three lines apply this color to several different device types using the `on-device` function.  The first call applies to devices with per-key illumination (e.g. the Apex M800), and applies the color as a percentage bar across the zone containing the function keys.  The second call applies to devices with exactly 2 zones of RGB illumination, and applies the color to the second zone on each device of that type.  The final call applies to devices with exactly 1 zone of RGB illumination, and applies the color to the first (and only) zone on each device of that type.
 
-5.The last line of this example declares that the `HEALTH` event utilizes the `function-keys` zone on per-key-illuminated devices.  This is necessary for initialization of the proper keys on the Apex M800 (and other future per-key-illuminated devices). 
+5.The last line of this example declares that the `HEALTH` event utilizes the `function-keys` zone on per-key-illuminated devices.  This is necessary for initialization of the proper keys on the Apex M800 (and other future per-key-illuminated devices).
 
 Detailed explanations of all of the GameSense™-exclusive primitives and functions are available in the rest of this document.  Documentation for the rest of the primitives is in [the GoLisp documentation][golisp documentation].
 
@@ -159,6 +170,14 @@ The `all-events-use-this-per-key-zone` primitive is a shortcut for the above, an
     ;; This is the shortcut
     (all-events-use-this-per-key-zone "function-keys")
 
+**`add-event-zone-use-with-specifier`** `<event name>` `<zone name>` `<specifier name>`
+
+The `add-event-zone-use-with-specifier` primitive is required for SteelSeries Engine configuration purposes when writing custom GoLisp Handlers. The system uses these declarations to know what zones are actually in use by handlers so the user can still configure other zones from Engine.  The event name and zone name should be passed in as strings and the specifier name should be passed in as a string or quoted symbol.
+
+    (add-event-zone-use-with-specifier "HEALTH" "one" "rgb-2-zone")
+
+    ;; This is also acceptable
+    (add-event-zone-use-with-specifier "HEALTH" "one" 'rgb-2-zone)
 
 **`event-autoinit-exclusion`** `<list of event names>`
 
@@ -208,16 +227,16 @@ This is the lowest level way to set key colors on per-key-illuminated devices. `
 **`vibrate:`** `<vibration event list>`
 Plays a series of vibrations on a device with a single vibration motor.
 
-**`vibrate-on-zone:` `<vibration event list>`
+**`vibrate-on-zone:`** `<vibration event list>`
 Plays a series of vibrations on a vibration zone on a device.  For information on available zones by device type, see the [list of standard device types and zones][zones-types].
 
-**`show-text:` `<text string>`
+**`show-text:`** `<text string>`
 Shows text on the screen of a device with a single embedded OLED or LCD screen.
 
-**`show-text-on-zone:` `<text string>`
+**`show-text-on-zone:`** `<text string>`
 Shows text on a screen of a device with one or more embedded OLED or LCD screens.  For information on available zones by device type, see the [list of standard device types and zones][zones-types].
 
-**`show-text-with-icon-on-zone:` `<text string>` `<icon id>` `<zone>`
+**`show-text-with-icon-on-zone:`** `<text string>` `<icon id>` `<zone>`
 Shows an icon and text on a screen of a device with one or more embedded OLED or LCD screens.  For information on available zones by device type, see the [list of standard device types and zones][zones-types].  For a list of icon ids, see [Event icons][event-icons].
 
 Examples:
@@ -256,7 +275,7 @@ If your handlers will be making use of predefined zones on the M800 you need to 
 
     (add-event-per-key-zone-use "HEALTH" "number-keys")
     (add-event-per-key-zone-use "AMMO" "function-keys")
- 
+
 Devices with per-key illumination (e.g. the Apex M800) support custom zones.  See the `add-custom-zone` and `define-custom-zones` primitives above for details. Devices with fixed zones simply ignore anything to do with custom zones.  
 
 ### Color manipulation ###
@@ -312,13 +331,13 @@ These `with-` functions return a new color list containing the changed value.
 Something that is very useful is to compute a color at some point on the gradient between two others.
 
 **`color-between`** `<zero percent color>` `<hundred percent color>` `<percentage>`
-    
+
     (color-between '(255 0 0) '(0 255 0) 50) ==> (127 127 0)
 
-    (map (lambda (x) 
-           (color-between '(255 0 0) '(0 255 0) x)) 
+    (map (lambda (x)
+           (color-between '(255 0 0) '(0 255 0) x))
          (interval 0 100 10))
-    
+
     ((255 0 0)
      (229 25 0)
      (204 51 0)
@@ -342,10 +361,10 @@ Sometimes you will want to blend two colors, using some percentage of the second
 
 For example, it you wanted to fade to white you would blend white into your color, with increasing values of `percentage`.
 
-    (map (lambda (i) 
+    (map (lambda (i)
            (blend red-color white-color i))
          (interval 0 100 10))
-    
+
     ((255 0 0)
      (255 25 25)
      (255 51 51)
@@ -523,3 +542,4 @@ When you write event handler code, you provide a device type when sending illumi
 [api doc]: /doc/api/sending-game-events.md
 [zones-types]: /doc/api/standard-zones.md "Device types and zones"
 [event-icons]: /doc/api/event-icons.md
+[server discovery]: /doc/api/sending-game-events.md#server-discovery
